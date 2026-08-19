@@ -18,7 +18,7 @@ export function getWebviewHtml(nonce: string): string {
   --handle: var(--vscode-button-background);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: var(--vscode-font-family, sans-serif); font-size: 13px; color: var(--fg); background: var(--bg); padding: 12px; }
+body { font-family: var(--vscode-font-family, sans-serif); font-size: 13px; color: var(--fg); background: var(--bg); padding: 12px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
 .toolbar { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
 .toolbar button {
@@ -28,7 +28,7 @@ body { font-family: var(--vscode-font-family, sans-serif); font-size: 13px; colo
 .toolbar button:hover { background: var(--btn-hover); }
 .toolbar button.align-active { outline: 2px solid var(--focus); outline-offset: -2px; }
 
-.grid-wrap { overflow: auto; max-height: calc(100vh - 120px); position: relative; }
+.grid-wrap { overflow: auto; flex: 1; min-height: 0; position: relative; }
 .table-container { position: relative; display: inline-block; }
 table { border-collapse: collapse; }
 th, td {
