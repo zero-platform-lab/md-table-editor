@@ -131,8 +131,7 @@ th[data-col]:active { cursor: grabbing; }
   <button id="alignCenter" title="中央揃え" class="align-btn">&#9776;</button>
   <button id="alignRight" title="右揃え" class="align-btn">&#9776;&#8594;</button>
   <span style="flex:1"></span>
-  <button id="undo" title="Ctrl+Z">↩ Undo</button>
-  <button id="redo" title="Ctrl+Y">↪ Redo</button>
+  <button id="applyBtn" style="display:none" title="Markdownに適用">&#10003; Apply</button>
 </div>
 <div class="grid-wrap">
   <div class="table-container" id="tableContainer">
@@ -142,6 +141,10 @@ th[data-col]:active { cursor: grabbing; }
     <div class="handle-corner" id="handleCorner" title="ドラッグで行列追加"></div>
   </div>
 </div>
+<div class="toolbar" style="margin-top:8px;">
+  <button id="undo" title="Ctrl+Z">↩ Undo</button>
+  <button id="redo" title="Ctrl+Y">↪ Redo</button>
+</div>
 
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
@@ -150,6 +153,8 @@ let rows = [];
 let alignments = [];
 let focusedRow = -1;
 let focusedCol = -1;
+let debounceMs = 300;
+let syncMode = 'auto';
 
 window.addEventListener('message', e => {
   const msg = e.data;
@@ -157,6 +162,9 @@ window.addEventListener('message', e => {
     headers = msg.headers;
     rows = msg.rows;
     alignments = msg.alignments;
+    if (msg.debounceMs != null) debounceMs = msg.debounceMs;
+    if (msg.syncMode) syncMode = msg.syncMode;
+    document.getElementById('applyBtn').style.display = syncMode === 'manual' ? '' : 'none';
     render();
     snapshot();
   }
@@ -291,12 +299,13 @@ function emptyRow() { return new Array(headers.length).fill(''); }
 
 let syncTimer = null;
 function sync() {
+  if (syncMode === 'manual') return;
   if (syncTimer) clearTimeout(syncTimer);
   syncTimer = setTimeout(() => {
     snapshot();
     vscode.postMessage({ type: 'apply', headers, rows, alignments });
     syncTimer = null;
-  }, 500);
+  }, debounceMs);
 }
 function syncNow() {
   if (syncTimer) clearTimeout(syncTimer);
@@ -361,6 +370,8 @@ function updateAlignButtons() {
   document.getElementById('alignCenter').classList.toggle('align-active', cur === 'center');
   document.getElementById('alignRight').classList.toggle('align-active', cur === 'right');
 }
+
+document.getElementById('applyBtn').addEventListener('click', () => syncNow());
 
 document.getElementById('alignLeft').addEventListener('click', () => setAlignment('left'));
 document.getElementById('alignCenter').addEventListener('click', () => setAlignment('center'));

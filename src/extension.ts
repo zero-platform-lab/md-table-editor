@@ -93,7 +93,10 @@ function openPanel(
   }, null, context.subscriptions);
 
   setTimeout(() => {
-    panel.webview.postMessage({ type: 'load', headers, rows, alignments });
+    const config = vscode.workspace.getConfiguration('mdTableEditor');
+    const debounceMs = config.get<number>('debounceMs', 300);
+    const syncMode = config.get<string>('syncMode', 'auto');
+    panel.webview.postMessage({ type: 'load', headers, rows, alignments, debounceMs, syncMode });
   }, 100);
 }
 

@@ -2,7 +2,7 @@
   "name": "md-table-editor",
   "displayName": "Markdown Table Editor",
   "description": "Edit Markdown tables in a visual grid UI",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -33,6 +33,24 @@
           "group": "1_modification@2"
         }
       ]
+    },
+    "configuration": {
+      "title": "Markdown Table Editor",
+      "properties": {
+        "mdTableEditor.syncMode": {
+          "type": "string",
+          "enum": ["auto", "manual"],
+          "default": "auto",
+          "description": "Sync mode: 'auto' syncs on keystroke with debounce, 'manual' requires clicking Apply"
+        },
+        "mdTableEditor.debounceMs": {
+          "type": "number",
+          "default": 300,
+          "minimum": 50,
+          "maximum": 5000,
+          "description": "Delay (ms) before syncing cell edits to Markdown"
+        }
+      }
     },
     "keybindings": [
       {
