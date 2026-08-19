@@ -161,8 +161,9 @@ window.addEventListener('message', e => {
     alignments = msg.alignments;
     const fr = focusedRow;
     const fc = focusedCol;
+    const hadFocus = document.hasFocus();
     render();
-    if (fr >= -1 && fc >= 0) {
+    if (hadFocus && fr >= -1 && fc >= 0) {
       moveFocus(fr, fc);
     }
   }
