@@ -41,10 +41,11 @@ function openPanel(
     return;
   }
 
-  const title = headers.slice(0, 3).join(' | ');
+  const tableIndex = getTableIndex(editor.document, range);
+  const title = 'Table ' + tableIndex;
   const panel = vscode.window.createWebviewPanel(
     'mdTableEditor',
-    title || 'Table Editor',
+    title,
     vscode.ViewColumn.Beside,
     { enableScripts: true, retainContextWhenHidden: true }
   );
@@ -69,7 +70,8 @@ function openPanel(
           panels.delete(key);
           state.headerSig = newSig;
           panels.set(panelKey(editor.document.uri, newSig), state);
-          panel.title = msg.headers.slice(0, 3).join(' | ') || 'Table Editor';
+          const idx = getTableIndex(editor.document, state.range);
+          panel.title = 'Table ' + idx;
         }
         await applyChanges(state, msg);
       }
@@ -222,6 +224,16 @@ async function applyChanges(state: PanelState, msg: { headers: string[]; rows: s
     const newRange = findTable(newLines, insertLine);
     if (newRange) state.range = newRange;
   }
+}
+
+function getTableIndex(doc: vscode.TextDocument, range: TableRange | undefined): number {
+  if (!range) return 0;
+  const lines = doc.getText().split('\n');
+  const tables = findAllTables(lines);
+  for (let i = 0; i < tables.length; i++) {
+    if (tables[i].startLine === range.startLine) return i + 1;
+  }
+  return 0;
 }
 
 function getNonce(): string {
