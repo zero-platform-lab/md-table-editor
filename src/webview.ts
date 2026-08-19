@@ -123,15 +123,19 @@ th[data-col]:active { cursor: grabbing; }
   <button id="addRowAbove" title="上に行追加">+ 行↑</button>
   <button id="addRowBelow" title="下に行追加">+ 行↓</button>
   <button id="deleteRow" title="行削除">− 行</button>
+  <span style="border-left:1px solid var(--border);margin:0 2px"></span>
   <button id="addColLeft" title="左に列追加">+ 列←</button>
   <button id="addColRight" title="右に列追加">+ 列→</button>
   <button id="deleteCol" title="列削除">− 列</button>
-  <span style="border-left:1px solid var(--border);margin:0 2px"></span>
+</div>
+<div class="toolbar" style="margin-top:0;">
   <button id="alignLeft" title="左揃え" class="align-btn">&#9776;&#8592;</button>
   <button id="alignCenter" title="中央揃え" class="align-btn">&#9776;</button>
   <button id="alignRight" title="右揃え" class="align-btn">&#9776;&#8594;</button>
-  <span style="flex:1"></span>
+  <span style="border-left:1px solid var(--border);margin:0 2px"></span>
   <button id="applyBtn" style="display:none" title="Markdownに適用">&#10003; Apply</button>
+  <button id="undo" title="Ctrl+Z">↩ Undo</button>
+  <button id="redo" title="Ctrl+Y">↪ Redo</button>
 </div>
 <div class="grid-wrap">
   <div class="table-container" id="tableContainer">
@@ -140,10 +144,6 @@ th[data-col]:active { cursor: grabbing; }
     <div class="handle-bottom" id="handleBottom" title="↑ ↓ ドラッグで行追加"></div>
     <div class="handle-corner" id="handleCorner" title="ドラッグで行列追加"></div>
   </div>
-</div>
-<div class="toolbar" style="margin-top:16px;margin-bottom:0;">
-  <button id="undo" title="Ctrl+Z">↩ Undo</button>
-  <button id="redo" title="Ctrl+Y">↪ Redo</button>
 </div>
 
 <script nonce="${nonce}">
