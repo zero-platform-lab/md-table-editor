@@ -6,6 +6,7 @@ let currentPanel: vscode.WebviewPanel | undefined;
 let currentEditor: vscode.TextEditor | undefined;
 let currentRange: TableRange | undefined;
 let isInsertMode = false;
+let isSelfEdit = false;
 
 function openPanel(
   context: vscode.ExtensionContext,
@@ -91,6 +92,25 @@ export function activate(context: vscode.ExtensionContext) {
       const alignments = ['none', 'none', 'none'];
 
       openPanel(context, editor, headers, rows, alignments, undefined, true);
+    }),
+
+    vscode.workspace.onDidChangeTextDocument((e) => {
+      if (isSelfEdit) return;
+      if (!currentPanel || !currentEditor || !currentRange) return;
+      if (e.document !== currentEditor.document) return;
+
+      const lines = e.document.getText().split('\n');
+      const range = findTable(lines, currentRange.startLine);
+      if (!range) return;
+
+      currentRange = range;
+      const tableData = parseTable(lines, range);
+      currentPanel.webview.postMessage({
+        type: 'load',
+        headers: tableData.headers,
+        rows: tableData.rows,
+        alignments: tableData.alignments,
+      });
     })
   );
 }
@@ -120,7 +140,9 @@ async function applyChanges(msg: { headers: string[]; rows: string[][]; alignmen
     edit.replace(doc.uri, new vscode.Range(startPos, endPos), newTable);
   }
 
+  isSelfEdit = true;
   const ok = await vscode.workspace.applyEdit(edit);
+  isSelfEdit = false;
 
   if (ok) {
     isInsertMode = false;
