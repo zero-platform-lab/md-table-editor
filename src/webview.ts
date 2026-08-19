@@ -26,6 +26,7 @@ body { font-family: var(--vscode-font-family, sans-serif); font-size: 13px; colo
   padding: 4px 10px; cursor: pointer; border-radius: 3px; font-size: 12px;
 }
 .toolbar button:hover { background: var(--btn-hover); }
+.toolbar button.align-active { outline: 2px solid var(--focus); outline-offset: -2px; }
 
 .grid-wrap { overflow: auto; max-height: calc(100vh - 80px); position: relative; }
 .table-container { position: relative; display: inline-block; }
@@ -125,6 +126,10 @@ th[data-col]:active { cursor: grabbing; }
   <button id="addColLeft" title="左に列追加">+ 列←</button>
   <button id="addColRight" title="右に列追加">+ 列→</button>
   <button id="deleteCol" title="列削除">− 列</button>
+  <span style="border-left:1px solid var(--border);margin:0 2px"></span>
+  <button id="alignLeft" title="左揃え" class="align-btn">&#9776;&#8592;</button>
+  <button id="alignCenter" title="中央揃え" class="align-btn">&#9776;</button>
+  <button id="alignRight" title="右揃え" class="align-btn">&#9776;&#8594;</button>
   <span style="flex:1"></span>
   <button id="undo" title="Ctrl+Z">↩ Undo</button>
   <button id="redo" title="Ctrl+Y">↪ Redo</button>
@@ -189,9 +194,21 @@ function render() {
     th.textContent = h;
     th.dataset.row = '-1';
     th.dataset.col = String(ci);
-    th.addEventListener('focus', () => { focusedRow = -1; focusedCol = ci; });
+    const align = alignments[ci];
+    if (align === 'left') th.style.textAlign = 'left';
+    else if (align === 'center') th.style.textAlign = 'center';
+    else if (align === 'right') th.style.textAlign = 'right';
+    th.addEventListener('focus', () => { focusedRow = -1; focusedCol = ci; updateAlignButtons(); });
     th.addEventListener('input', () => { headers[ci] = th.textContent || ''; sync(); });
     th.addEventListener('keydown', handleKeydown);
+    th.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      const cycle = { none: 'left', left: 'center', center: 'right', right: 'none' };
+      alignments[ci] = cycle[alignments[ci]] || 'left';
+      focusedCol = ci;
+      updateAlignButtons();
+      render(); syncNow();
+    });
     setupColDrag(th, ci);
     hr.appendChild(th);
   });
@@ -213,7 +230,11 @@ function render() {
       td.textContent = cell;
       td.dataset.row = String(ri);
       td.dataset.col = String(ci);
-      td.addEventListener('focus', () => { focusedRow = ri; focusedCol = ci; });
+      const align = alignments[ci];
+      if (align === 'left') td.style.textAlign = 'left';
+      else if (align === 'center') td.style.textAlign = 'center';
+      else if (align === 'right') td.style.textAlign = 'right';
+      td.addEventListener('focus', () => { focusedRow = ri; focusedCol = ci; updateAlignButtons(); });
       td.addEventListener('input', () => { rows[ri][ci] = td.textContent || ''; sync(); });
       td.addEventListener('keydown', handleKeydown);
       tr.appendChild(td);
@@ -275,7 +296,7 @@ function sync() {
     snapshot();
     vscode.postMessage({ type: 'apply', headers, rows, alignments });
     syncTimer = null;
-  }, 100);
+  }, 500);
 }
 function syncNow() {
   if (syncTimer) clearTimeout(syncTimer);
@@ -324,6 +345,26 @@ document.getElementById('deleteCol').addEventListener('click', () => {
     render(); syncNow();
   }
 });
+
+// --- Alignment ---
+
+function setAlignment(align) {
+  if (focusedCol < 0) return;
+  alignments[focusedCol] = alignments[focusedCol] === align ? 'none' : align;
+  updateAlignButtons();
+  render(); syncNow();
+}
+
+function updateAlignButtons() {
+  const cur = focusedCol >= 0 ? alignments[focusedCol] : 'none';
+  document.getElementById('alignLeft').classList.toggle('align-active', cur === 'left');
+  document.getElementById('alignCenter').classList.toggle('align-active', cur === 'center');
+  document.getElementById('alignRight').classList.toggle('align-active', cur === 'right');
+}
+
+document.getElementById('alignLeft').addEventListener('click', () => setAlignment('left'));
+document.getElementById('alignCenter').addEventListener('click', () => setAlignment('center'));
+document.getElementById('alignRight').addEventListener('click', () => setAlignment('right'));
 
 // --- Undo / Redo ---
 
