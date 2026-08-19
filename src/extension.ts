@@ -220,9 +220,24 @@ async function applyChanges(state: PanelState, msg: { headers: string[]; rows: s
     if (!editor) return;
     const pos = editor.selection.active;
     const lineText = doc.lineAt(pos.line).text;
-    const prefix = lineText.trim().length > 0 ? '\n\n' : '';
+    const hasText = lineText.trim().length > 0;
+    const prefix = hasText ? '\n\n' : '';
     const suffix = '\n';
     edit.insert(state.docUri, new vscode.Position(pos.line, lineText.length), prefix + newTable + suffix);
+
+    isSelfEdit = true;
+    const ok2 = await vscode.workspace.applyEdit(edit);
+    isSelfEdit = false;
+    if (ok2) {
+      state.isInsertMode = false;
+      const newLines = doc.getText().split('\n');
+      const tableStart = hasText ? pos.line + 2 : pos.line;
+      const newRange = findTable(newLines, tableStart)
+        ?? findTableByHeaders(newLines, msg.headers);
+      if (newRange) state.range = newRange;
+      refreshAllRanges(doc);
+    }
+    return;
   } else {
     const lines = doc.getText().split('\n');
     let range = findTable(lines, state.range.startLine);
@@ -242,10 +257,8 @@ async function applyChanges(state: PanelState, msg: { headers: string[]; rows: s
   isSelfEdit = false;
 
   if (ok) {
-    state.isInsertMode = false;
     const newLines = doc.getText().split('\n');
-    const insertLine = state.range?.startLine ?? (editor?.selection.active.line ?? 0);
-    const newRange = findTable(newLines, insertLine);
+    const newRange = findTable(newLines, state.range!.startLine);
     if (newRange) state.range = newRange;
 
     refreshAllRanges(doc);
