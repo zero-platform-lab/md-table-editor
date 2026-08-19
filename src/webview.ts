@@ -28,7 +28,7 @@ body { font-family: var(--vscode-font-family, sans-serif); font-size: 13px; colo
 .toolbar button:hover { background: var(--btn-hover); }
 .toolbar button.align-active { outline: 2px solid var(--focus); outline-offset: -2px; }
 
-.grid-wrap { overflow: auto; max-height: calc(100vh - 80px); position: relative; }
+.grid-wrap { overflow: auto; max-height: calc(100vh - 120px); position: relative; }
 .table-container { position: relative; display: inline-block; }
 table { border-collapse: collapse; }
 th, td {
