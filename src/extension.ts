@@ -208,9 +208,16 @@ async function applyChanges(state: PanelState, msg: { headers: string[]; rows: s
     const suffix = '\n';
     edit.insert(doc.uri, new vscode.Position(pos.line, lineText.length), prefix + newTable + suffix);
   } else {
-    const startPos = new vscode.Position(state.range.startLine, 0);
-    const endLine = state.range.endLine;
-    const endPos = new vscode.Position(endLine, doc.lineAt(endLine).text.length);
+    const lines = doc.getText().split('\n');
+    let range = findTable(lines, state.range.startLine);
+    if (!range) {
+      range = findTableByHeaders(lines, state.headerSig.split('\x00'));
+    }
+    if (!range) return;
+    state.range = range;
+
+    const startPos = new vscode.Position(range.startLine, 0);
+    const endPos = new vscode.Position(range.endLine, doc.lineAt(range.endLine).text.length);
     edit.replace(doc.uri, new vscode.Range(startPos, endPos), newTable);
   }
 
@@ -224,6 +231,22 @@ async function applyChanges(state: PanelState, msg: { headers: string[]; rows: s
     const insertLine = state.range?.startLine ?? state.editor.selection.active.line;
     const newRange = findTable(newLines, insertLine);
     if (newRange) state.range = newRange;
+
+    refreshAllRanges(doc);
+  }
+}
+
+function refreshAllRanges(doc: vscode.TextDocument) {
+  const lines = doc.getText().split('\n');
+  for (const state of panels.values()) {
+    if (state.editor.document !== doc) continue;
+    if (!state.range || state.isInsertMode) continue;
+
+    let range = findTable(lines, state.range.startLine);
+    if (!range) {
+      range = findTableByHeaders(lines, state.headerSig.split('\x00'));
+    }
+    if (range) state.range = range;
   }
 }
 
