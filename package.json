@@ -1,0 +1,63 @@
+{
+  "name": "md-table-editor",
+  "displayName": "Markdown Table Editor",
+  "description": "Edit Markdown tables in a visual grid UI",
+  "version": "0.2.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mdTableEditor.editTable",
+        "title": "Edit Table in Grid"
+      },
+      {
+        "command": "mdTableEditor.newTable",
+        "title": "New Table"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "mdTableEditor.editTable",
+          "when": "editorLangId == markdown",
+          "group": "1_modification@1"
+        },
+        {
+          "command": "mdTableEditor.newTable",
+          "when": "editorLangId == markdown",
+          "group": "1_modification@2"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "mdTableEditor.editTable",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t",
+        "when": "editorLangId == markdown"
+      },
+      {
+        "command": "mdTableEditor.newTable",
+        "key": "ctrl+shift+n",
+        "mac": "cmd+shift+n",
+        "when": "editorLangId == markdown"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/vscode": "^1.80.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.3.0"
+  }
+}
