@@ -12,6 +12,7 @@ interface PanelState {
 
 const panels: Map<string, PanelState> = new Map();
 let isSelfEdit = false;
+let newTableCounter = 0;
 
 function headerSig(headers: string[]): string {
   return headers.join('\x00');
@@ -30,7 +31,7 @@ function openPanel(
   range: TableRange | undefined,
   insertMode: boolean
 ) {
-  const sig = headerSig(headers);
+  const sig = insertMode ? '__new_' + (++newTableCounter) : headerSig(headers);
   const key = panelKey(editor.document.uri, sig);
 
   const existing = panels.get(key);
@@ -41,7 +42,7 @@ function openPanel(
     return;
   }
 
-  const tableIndex = getTableIndex(editor.document, range);
+  const tableIndex = insertMode ? 'New' : String(getTableIndex(editor.document, range));
   const title = 'Table ' + tableIndex;
   const panel = vscode.window.createWebviewPanel(
     'mdTableEditor',
