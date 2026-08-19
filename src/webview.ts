@@ -20,7 +20,7 @@ export function getWebviewHtml(nonce: string): string {
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--vscode-font-family, sans-serif); font-size: 13px; color: var(--fg); background: var(--bg); padding: 12px; }
 
-.toolbar { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.toolbar { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
 .toolbar button {
   background: var(--btn-bg); color: var(--btn-fg); border: none;
   padding: 4px 10px; cursor: pointer; border-radius: 3px; font-size: 12px;
@@ -141,7 +141,7 @@ th[data-col]:active { cursor: grabbing; }
     <div class="handle-corner" id="handleCorner" title="ドラッグで行列追加"></div>
   </div>
 </div>
-<div class="toolbar" style="margin-top:8px;">
+<div class="toolbar" style="margin-top:16px;margin-bottom:0;">
   <button id="undo" title="Ctrl+Z">↩ Undo</button>
   <button id="redo" title="Ctrl+Y">↪ Redo</button>
 </div>
