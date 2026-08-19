@@ -128,9 +128,6 @@ async function applyChanges(msg: { headers: string[]; rows: string[][]; alignmen
     const insertLine = currentRange?.startLine ?? currentEditor.selection.active.line;
     const newRange = findTable(newLines, insertLine);
     if (newRange) currentRange = newRange;
-    vscode.window.showInformationMessage('テーブルを更新しました');
-  } else {
-    vscode.window.showErrorMessage('テーブルの更新に失敗しました');
   }
 }
 

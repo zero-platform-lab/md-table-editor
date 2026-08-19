@@ -171,7 +171,7 @@ function render() {
     th.dataset.row = '-1';
     th.dataset.col = String(ci);
     th.addEventListener('focus', () => { focusedRow = -1; focusedCol = ci; });
-    th.addEventListener('blur', () => { headers[ci] = th.textContent || ''; });
+    th.addEventListener('blur', () => { headers[ci] = th.textContent || ''; sync(); });
     th.addEventListener('keydown', handleKeydown);
     setupColDrag(th, ci);
     hr.appendChild(th);
@@ -195,7 +195,7 @@ function render() {
       td.dataset.row = String(ri);
       td.dataset.col = String(ci);
       td.addEventListener('focus', () => { focusedRow = ri; focusedCol = ci; });
-      td.addEventListener('blur', () => { rows[ri][ci] = td.textContent || ''; });
+      td.addEventListener('blur', () => { rows[ri][ci] = td.textContent || ''; sync(); });
       td.addEventListener('keydown', handleKeydown);
       tr.appendChild(td);
     });
@@ -249,21 +249,25 @@ function selectRow(ri) {
 
 function emptyRow() { return new Array(headers.length).fill(''); }
 
+function sync() {
+  vscode.postMessage({ type: 'apply', headers, rows, alignments });
+}
+
 document.getElementById('addRowAbove').addEventListener('click', () => {
   const idx = Math.max(0, focusedRow);
   rows.splice(idx, 0, emptyRow());
-  render();
+  render(); sync();
 });
 document.getElementById('addRowBelow').addEventListener('click', () => {
   const idx = focusedRow < 0 ? 0 : focusedRow + 1;
   rows.splice(idx, 0, emptyRow());
-  render();
+  render(); sync();
 });
 document.getElementById('deleteRow').addEventListener('click', () => {
   if (focusedRow >= 0 && rows.length > 1) {
     rows.splice(focusedRow, 1);
     if (focusedRow >= rows.length) focusedRow = rows.length - 1;
-    render();
+    render(); sync();
   }
 });
 document.getElementById('addColLeft').addEventListener('click', () => {
@@ -271,14 +275,14 @@ document.getElementById('addColLeft').addEventListener('click', () => {
   headers.splice(idx, 0, '');
   alignments.splice(idx, 0, 'none');
   rows.forEach(r => r.splice(idx, 0, ''));
-  render();
+  render(); sync();
 });
 document.getElementById('addColRight').addEventListener('click', () => {
   const idx = focusedCol < 0 ? headers.length : focusedCol + 1;
   headers.splice(idx, 0, '');
   alignments.splice(idx, 0, 'none');
   rows.forEach(r => r.splice(idx, 0, ''));
-  render();
+  render(); sync();
 });
 document.getElementById('deleteCol').addEventListener('click', () => {
   if (focusedCol >= 0 && headers.length > 1) {
@@ -286,7 +290,7 @@ document.getElementById('deleteCol').addEventListener('click', () => {
     alignments.splice(focusedCol, 1);
     rows.forEach(r => r.splice(focusedCol, 1));
     if (focusedCol >= headers.length) focusedCol = headers.length - 1;
-    render();
+    render(); sync();
   }
 });
 
@@ -359,7 +363,7 @@ function setupRowDrag(numCell, ri) {
         rows.splice(insertAt, 0, moved);
       }
       dragRowIdx = -1;
-      render();
+      render(); sync();
     }
 
     document.addEventListener('mousemove', onMove);
@@ -448,7 +452,7 @@ function setupColDrag(thCell, ci) {
           });
         }
         dragColIdx = -1;
-        render();
+        render(); sync();
       }
 
       document.addEventListener('mousemove', onMove2);
@@ -490,36 +494,46 @@ function setupDragHandle(handleEl, mode) {
       cellH = 28;
     }
 
-    let addedCols = 0;
-    let addedRows = 0;
+    let delta = 0;
+    const startColCount = headers.length;
+    const startRowCount = rows.length;
 
     function onMove(ev) {
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
 
       if (mode === 'right' || mode === 'corner') {
-        const targetCols = Math.floor(dx / cellW);
-        while (addedCols < targetCols) {
+        const targetDelta = Math.round(dx / cellW);
+        const targetCols = Math.max(1, startColCount + targetDelta);
+        while (headers.length < targetCols) {
           headers.push('');
           alignments.push('none');
           rows.forEach(r => r.push(''));
-          addedCols++;
-          render();
         }
+        while (headers.length > targetCols && headers.length > 1) {
+          headers.pop();
+          alignments.pop();
+          rows.forEach(r => r.pop());
+        }
+        render();
       }
       if (mode === 'bottom' || mode === 'corner') {
-        const targetRows = Math.floor(dy / cellH);
-        while (addedRows < targetRows) {
+        const targetDelta = Math.round(dy / cellH);
+        const targetRows = Math.max(1, startRowCount + targetDelta);
+        while (rows.length < targetRows) {
           rows.push(emptyRow());
-          addedRows++;
-          render();
         }
+        while (rows.length > targetRows && rows.length > 1) {
+          rows.pop();
+        }
+        render();
       }
     }
 
     function onUp() {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      sync();
     }
 
     document.addEventListener('mousemove', onMove);
