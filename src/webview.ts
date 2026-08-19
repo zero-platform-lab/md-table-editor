@@ -155,6 +155,11 @@ window.addEventListener('message', e => {
     render();
     snapshot();
   }
+  if (msg.type === 'tableDeleted') {
+    const table = document.getElementById('grid');
+    table.innerHTML = '<tr><td style="padding:20px;opacity:0.5;">テーブルが削除されました</td></tr>';
+    return;
+  }
   if (msg.type === 'update') {
     headers = msg.headers;
     rows = msg.rows;

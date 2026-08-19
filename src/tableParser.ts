@@ -15,7 +15,21 @@ function parseRow(line: string): string[] {
   let trimmed = line.trim();
   if (trimmed.startsWith('|')) trimmed = trimmed.slice(1);
   if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1);
-  return trimmed.split('|').map(cell => cell.trim());
+  const cells: string[] = [];
+  let current = '';
+  for (let i = 0; i < trimmed.length; i++) {
+    if (trimmed[i] === '\\' && i + 1 < trimmed.length && trimmed[i + 1] === '|') {
+      current += '|';
+      i++;
+    } else if (trimmed[i] === '|') {
+      cells.push(current.trim());
+      current = '';
+    } else {
+      current += trimmed[i];
+    }
+  }
+  cells.push(current.trim());
+  return cells;
 }
 
 function parseAlignment(cell: string): 'left' | 'center' | 'right' | 'none' {
@@ -101,11 +115,13 @@ export function parseTable(lines: string[], range: TableRange): TableData {
 export function serializeTable(data: TableData): string {
   const colCount = data.headers.length;
 
+  const esc = (s: string) => s.replace(/\|/g, '\\|');
+
   const colWidths: number[] = [];
   for (let c = 0; c < colCount; c++) {
-    let max = byteLength(data.headers[c]);
+    let max = byteLength(esc(data.headers[c]));
     for (const row of data.rows) {
-      max = Math.max(max, byteLength(row[c] || ''));
+      max = Math.max(max, byteLength(esc(row[c] || '')));
     }
     colWidths.push(Math.max(max, 3));
   }
@@ -115,7 +131,7 @@ export function serializeTable(data: TableData): string {
     return text + ' '.repeat(Math.max(0, pad));
   };
 
-  const headerLine = '| ' + data.headers.map((h, i) => padCell(h, colWidths[i])).join(' | ') + ' |';
+  const headerLine = '| ' + data.headers.map((h, i) => padCell(esc(h), colWidths[i])).join(' | ') + ' |';
 
   const sepLine = '| ' + data.alignments.map((a, i) => {
     const w = colWidths[i];
@@ -128,7 +144,7 @@ export function serializeTable(data: TableData): string {
   }).join(' | ') + ' |';
 
   const rowLines = data.rows.map(row =>
-    '| ' + row.map((cell, i) => padCell(cell || '', colWidths[i])).join(' | ') + ' |'
+    '| ' + row.map((cell, i) => padCell(esc(cell || ''), colWidths[i])).join(' | ') + ' |'
   );
 
   return [headerLine, sepLine, ...rowLines].join('\n');

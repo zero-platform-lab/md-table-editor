@@ -4,22 +4,36 @@ import { getWebviewHtml } from './webview';
 
 interface PanelState {
   panel: vscode.WebviewPanel;
-  editor: vscode.TextEditor;
+  docUri: vscode.Uri;
   range: TableRange | undefined;
   headerSig: string;
   isInsertMode: boolean;
+  id: string;
 }
 
 const panels: Map<string, PanelState> = new Map();
 let isSelfEdit = false;
-let newTableCounter = 0;
+let panelIdCounter = 0;
 
 function headerSig(headers: string[]): string {
   return headers.join('\x00');
 }
 
-function panelKey(uri: vscode.Uri, sig: string): string {
-  return uri.toString() + '\x01' + sig;
+function getEditor(uri: vscode.Uri): vscode.TextEditor | undefined {
+  return vscode.window.visibleTextEditors.find(e => e.document.uri.toString() === uri.toString());
+}
+
+function getDocument(uri: vscode.Uri): vscode.TextDocument | undefined {
+  return vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
+}
+
+function findExistingPanel(uri: vscode.Uri, range: TableRange | undefined): PanelState | undefined {
+  if (!range) return undefined;
+  for (const state of panels.values()) {
+    if (state.docUri.toString() !== uri.toString()) continue;
+    if (state.range && state.range.startLine === range.startLine) return state;
+  }
+  return undefined;
 }
 
 function openPanel(
@@ -31,17 +45,16 @@ function openPanel(
   range: TableRange | undefined,
   insertMode: boolean
 ) {
-  const sig = insertMode ? '__new_' + (++newTableCounter) : headerSig(headers);
-  const key = panelKey(editor.document.uri, sig);
-
-  const existing = panels.get(key);
+  const existing = findExistingPanel(editor.document.uri, range);
   if (existing) {
     existing.panel.reveal(vscode.ViewColumn.Beside);
     existing.range = range;
+    existing.headerSig = headerSig(headers);
     existing.panel.webview.postMessage({ type: 'load', headers, rows, alignments });
     return;
   }
 
+  const id = 'panel_' + (++panelIdCounter);
   const tableIndex = insertMode ? 'New' : String(getTableIndex(editor.document, range));
   const title = 'Table ' + tableIndex;
   const panel = vscode.window.createWebviewPanel(
@@ -56,24 +69,18 @@ function openPanel(
 
   const state: PanelState = {
     panel,
-    editor,
+    docUri: editor.document.uri,
     range,
-    headerSig: sig,
+    headerSig: headerSig(headers),
     isInsertMode: insertMode,
+    id,
   };
-  panels.set(key, state);
+  panels.set(id, state);
 
   panel.webview.onDidReceiveMessage(
     async (msg) => {
       if (msg.type === 'apply') {
-        const newSig = headerSig(msg.headers);
-        if (newSig !== state.headerSig) {
-          panels.delete(key);
-          state.headerSig = newSig;
-          panels.set(panelKey(editor.document.uri, newSig), state);
-          const idx = getTableIndex(editor.document, state.range);
-          panel.title = 'Table ' + idx;
-        }
+        state.headerSig = headerSig(msg.headers);
         await applyChanges(state, msg);
       }
     },
@@ -82,7 +89,7 @@ function openPanel(
   );
 
   panel.onDidDispose(() => {
-    panels.delete(panelKey(editor.document.uri, state.headerSig));
+    panels.delete(id);
   }, null, context.subscriptions);
 
   setTimeout(() => {
@@ -167,7 +174,7 @@ export function activate(context: vscode.ExtensionContext) {
       if (isSelfEdit) return;
 
       for (const state of panels.values()) {
-        if (e.document !== state.editor.document) continue;
+        if (e.document.uri.toString() !== state.docUri.toString()) continue;
         if (!state.range) continue;
 
         const lines = e.document.getText().split('\n');
@@ -176,7 +183,10 @@ export function activate(context: vscode.ExtensionContext) {
         if (!range) {
           range = findTableByHeaders(lines, state.headerSig.split('\x00'));
         }
-        if (!range) continue;
+        if (!range) {
+          state.panel.webview.postMessage({ type: 'tableDeleted' });
+          continue;
+        }
 
         state.range = range;
         const tableData = parseTable(lines, range);
@@ -198,15 +208,18 @@ async function applyChanges(state: PanelState, msg: { headers: string[]; rows: s
     alignments: msg.alignments as any,
   });
 
-  const doc = state.editor.document;
+  const doc = getDocument(state.docUri);
+  if (!doc) return;
+  const editor = getEditor(state.docUri);
   const edit = new vscode.WorkspaceEdit();
 
   if (state.isInsertMode || !state.range) {
-    const pos = state.editor.selection.active;
+    if (!editor) return;
+    const pos = editor.selection.active;
     const lineText = doc.lineAt(pos.line).text;
     const prefix = lineText.trim().length > 0 ? '\n\n' : '';
     const suffix = '\n';
-    edit.insert(doc.uri, new vscode.Position(pos.line, lineText.length), prefix + newTable + suffix);
+    edit.insert(state.docUri, new vscode.Position(pos.line, lineText.length), prefix + newTable + suffix);
   } else {
     const lines = doc.getText().split('\n');
     let range = findTable(lines, state.range.startLine);
@@ -218,7 +231,7 @@ async function applyChanges(state: PanelState, msg: { headers: string[]; rows: s
 
     const startPos = new vscode.Position(range.startLine, 0);
     const endPos = new vscode.Position(range.endLine, doc.lineAt(range.endLine).text.length);
-    edit.replace(doc.uri, new vscode.Range(startPos, endPos), newTable);
+    edit.replace(state.docUri, new vscode.Range(startPos, endPos), newTable);
   }
 
   isSelfEdit = true;
@@ -228,7 +241,7 @@ async function applyChanges(state: PanelState, msg: { headers: string[]; rows: s
   if (ok) {
     state.isInsertMode = false;
     const newLines = doc.getText().split('\n');
-    const insertLine = state.range?.startLine ?? state.editor.selection.active.line;
+    const insertLine = state.range?.startLine ?? (editor?.selection.active.line ?? 0);
     const newRange = findTable(newLines, insertLine);
     if (newRange) state.range = newRange;
 
@@ -239,7 +252,7 @@ async function applyChanges(state: PanelState, msg: { headers: string[]; rows: s
 function refreshAllRanges(doc: vscode.TextDocument) {
   const lines = doc.getText().split('\n');
   for (const state of panels.values()) {
-    if (state.editor.document !== doc) continue;
+    if (state.docUri.toString() !== doc.uri.toString()) continue;
     if (!state.range || state.isInsertMode) continue;
 
     let range = findTable(lines, state.range.startLine);

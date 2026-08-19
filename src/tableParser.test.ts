@@ -129,6 +129,28 @@ function testShortRows() {
   assert(t.rows[0][1] === '', 'padded cell should be empty');
 }
 
+// --- pipe escape ---
+
+function testPipeEscape() {
+  const src = lines([
+    '| A | B |',
+    '|---|---|',
+    '| hello\\|world | test |',
+  ].join('\n'));
+
+  const range: TableRange = { startLine: 0, endLine: 2 };
+  const t = parseTable(src, range);
+
+  assert(t.rows[0][0] === 'hello|world', `escaped pipe should be parsed, got "${t.rows[0][0]}"`);
+  assert(t.rows[0][1] === 'test', `second cell should be test, got "${t.rows[0][1]}"`);
+
+  const out = serializeTable(t);
+  assert(out.includes('hello\\|world'), `serialized should escape pipe, got "${out}"`);
+
+  const reparsed = parseTable(lines(out), { startLine: 0, endLine: out.split('\n').length - 1 });
+  assert(reparsed.rows[0][0] === 'hello|world', 'roundtrip pipe preserved');
+}
+
 // --- runner ---
 
 let passed = 0;
@@ -149,6 +171,7 @@ testParseTableJapanese();
 testSerialize();
 testRoundtrip();
 testShortRows();
+testPipeEscape();
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
