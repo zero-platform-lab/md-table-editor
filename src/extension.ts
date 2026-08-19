@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { findTable, findTableByHeaders, parseTable, serializeTable, TableRange } from './tableParser';
+import { findAllTables, findTable, findTableByHeaders, parseTable, serializeTable, TableRange } from './tableParser';
 import { getWebviewHtml } from './webview';
 
 let currentPanel: vscode.WebviewPanel | undefined;
@@ -65,8 +65,45 @@ function openPanel(
   }, 100);
 }
 
+class TableCodeLensProvider implements vscode.CodeLensProvider {
+  provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
+    if (document.languageId !== 'markdown') return [];
+    const lines = document.getText().split('\n');
+    const tables = findAllTables(lines);
+    return tables.map(range => {
+      const codeLens = new vscode.CodeLens(
+        new vscode.Range(range.startLine, 0, range.startLine, 0)
+      );
+      codeLens.command = {
+        title: '$(edit) Edit Table',
+        command: 'mdTableEditor.editTableAt',
+        arguments: [document.uri, range.startLine],
+      };
+      return codeLens;
+    });
+  }
+}
+
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
+    vscode.languages.registerCodeLensProvider(
+      { language: 'markdown' },
+      new TableCodeLensProvider()
+    ),
+
+    vscode.commands.registerCommand('mdTableEditor.editTableAt', (uri: vscode.Uri, line: number) => {
+      const editor = vscode.window.visibleTextEditors.find(e => e.document.uri.toString() === uri.toString())
+        ?? vscode.window.activeTextEditor;
+      if (!editor) return;
+
+      const lines = editor.document.getText().split('\n');
+      const range = findTable(lines, line);
+      if (!range) return;
+
+      const tableData = parseTable(lines, range);
+      openPanel(context, editor, tableData.headers, tableData.rows, tableData.alignments, range, false);
+    }),
+
     vscode.commands.registerCommand('mdTableEditor.editTable', () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {

@@ -50,6 +50,23 @@ export function findTable(lines: string[], cursorLine: number): TableRange | nul
   return { startLine: start, endLine: end };
 }
 
+export function findAllTables(lines: string[]): TableRange[] {
+  const results: TableRange[] = [];
+  let i = 0;
+  while (i < lines.length - 1) {
+    if (lines[i].includes('|') && SEPARATOR_RE.test(lines[i + 1])) {
+      const range = findTable(lines, i);
+      if (range) {
+        results.push(range);
+        i = range.endLine + 1;
+        continue;
+      }
+    }
+    i++;
+  }
+  return results;
+}
+
 export function findTableByHeaders(lines: string[], targetHeaders: string[]): TableRange | null {
   const sig = targetHeaders.join('\x00');
   for (let i = 0; i < lines.length - 1; i++) {
