@@ -126,7 +126,8 @@ th[data-col]:active { cursor: grabbing; }
   <button id="addColRight" title="右に列追加">+ 列→</button>
   <button id="deleteCol" title="列削除">− 列</button>
   <span style="flex:1"></span>
-  <button id="apply" style="font-weight:bold;">適用</button>
+  <button id="undo" title="Ctrl+Z">↩ Undo</button>
+  <button id="redo" title="Ctrl+Y">↪ Redo</button>
 </div>
 <div class="grid-wrap">
   <div class="table-container" id="tableContainer">
@@ -152,6 +153,18 @@ window.addEventListener('message', e => {
     rows = msg.rows;
     alignments = msg.alignments;
     render();
+    snapshot();
+  }
+  if (msg.type === 'update') {
+    headers = msg.headers;
+    rows = msg.rows;
+    alignments = msg.alignments;
+    const fr = focusedRow;
+    const fc = focusedCol;
+    render();
+    if (fr >= -1 && fc >= 0) {
+      moveFocus(fr, fc);
+    }
   }
 });
 
@@ -171,7 +184,7 @@ function render() {
     th.dataset.row = '-1';
     th.dataset.col = String(ci);
     th.addEventListener('focus', () => { focusedRow = -1; focusedCol = ci; });
-    th.addEventListener('blur', () => { headers[ci] = th.textContent || ''; sync(); });
+    th.addEventListener('input', () => { headers[ci] = th.textContent || ''; sync(); });
     th.addEventListener('keydown', handleKeydown);
     setupColDrag(th, ci);
     hr.appendChild(th);
@@ -195,7 +208,7 @@ function render() {
       td.dataset.row = String(ri);
       td.dataset.col = String(ci);
       td.addEventListener('focus', () => { focusedRow = ri; focusedCol = ci; });
-      td.addEventListener('blur', () => { rows[ri][ci] = td.textContent || ''; sync(); });
+      td.addEventListener('input', () => { rows[ri][ci] = td.textContent || ''; sync(); });
       td.addEventListener('keydown', handleKeydown);
       tr.appendChild(td);
     });
@@ -249,25 +262,37 @@ function selectRow(ri) {
 
 function emptyRow() { return new Array(headers.length).fill(''); }
 
+let syncTimer = null;
 function sync() {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    snapshot();
+    vscode.postMessage({ type: 'apply', headers, rows, alignments });
+    syncTimer = null;
+  }, 100);
+}
+function syncNow() {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = null;
+  snapshot();
   vscode.postMessage({ type: 'apply', headers, rows, alignments });
 }
 
 document.getElementById('addRowAbove').addEventListener('click', () => {
   const idx = Math.max(0, focusedRow);
   rows.splice(idx, 0, emptyRow());
-  render(); sync();
+  render(); syncNow();
 });
 document.getElementById('addRowBelow').addEventListener('click', () => {
   const idx = focusedRow < 0 ? 0 : focusedRow + 1;
   rows.splice(idx, 0, emptyRow());
-  render(); sync();
+  render(); syncNow();
 });
 document.getElementById('deleteRow').addEventListener('click', () => {
   if (focusedRow >= 0 && rows.length > 1) {
     rows.splice(focusedRow, 1);
     if (focusedRow >= rows.length) focusedRow = rows.length - 1;
-    render(); sync();
+    render(); syncNow();
   }
 });
 document.getElementById('addColLeft').addEventListener('click', () => {
@@ -275,14 +300,14 @@ document.getElementById('addColLeft').addEventListener('click', () => {
   headers.splice(idx, 0, '');
   alignments.splice(idx, 0, 'none');
   rows.forEach(r => r.splice(idx, 0, ''));
-  render(); sync();
+  render(); syncNow();
 });
 document.getElementById('addColRight').addEventListener('click', () => {
   const idx = focusedCol < 0 ? headers.length : focusedCol + 1;
   headers.splice(idx, 0, '');
   alignments.splice(idx, 0, 'none');
   rows.forEach(r => r.splice(idx, 0, ''));
-  render(); sync();
+  render(); syncNow();
 });
 document.getElementById('deleteCol').addEventListener('click', () => {
   if (focusedCol >= 0 && headers.length > 1) {
@@ -290,17 +315,54 @@ document.getElementById('deleteCol').addEventListener('click', () => {
     alignments.splice(focusedCol, 1);
     rows.forEach(r => r.splice(focusedCol, 1));
     if (focusedCol >= headers.length) focusedCol = headers.length - 1;
-    render(); sync();
+    render(); syncNow();
   }
 });
 
-document.getElementById('apply').addEventListener('click', () => {
-  if (document.activeElement && document.activeElement.blur) {
-    document.activeElement.blur();
+// --- Undo / Redo ---
+
+const history = [];
+let historyIdx = -1;
+let skipSnapshot = false;
+
+function snapshot() {
+  if (skipSnapshot) return;
+  const state = JSON.stringify({ headers, rows, alignments });
+  if (historyIdx >= 0 && history[historyIdx] === state) return;
+  history.splice(historyIdx + 1);
+  history.push(state);
+  if (history.length > 200) history.shift();
+  historyIdx = history.length - 1;
+}
+
+function restore(idx) {
+  if (idx < 0 || idx >= history.length) return;
+  historyIdx = idx;
+  const s = JSON.parse(history[idx]);
+  headers = s.headers;
+  rows = s.rows;
+  alignments = s.alignments;
+  skipSnapshot = true;
+  render();
+  syncNow();
+  skipSnapshot = false;
+}
+
+document.getElementById('undo').addEventListener('click', () => {
+  restore(historyIdx - 1);
+});
+document.getElementById('redo').addEventListener('click', () => {
+  restore(historyIdx + 1);
+});
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    restore(historyIdx - 1);
   }
-  setTimeout(() => {
-    vscode.postMessage({ type: 'apply', headers, rows, alignments });
-  }, 50);
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+    e.preventDefault();
+    restore(historyIdx + 1);
+  }
 });
 
 // --- Row reorder by dragging row numbers ---
@@ -363,7 +425,7 @@ function setupRowDrag(numCell, ri) {
         rows.splice(insertAt, 0, moved);
       }
       dragRowIdx = -1;
-      render(); sync();
+      render(); syncNow();
     }
 
     document.addEventListener('mousemove', onMove);
@@ -452,7 +514,7 @@ function setupColDrag(thCell, ci) {
           });
         }
         dragColIdx = -1;
-        render(); sync();
+        render(); syncNow();
       }
 
       document.addEventListener('mousemove', onMove2);
@@ -533,7 +595,7 @@ function setupDragHandle(handleEl, mode) {
     function onUp() {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      sync();
+      syncNow();
     }
 
     document.addEventListener('mousemove', onMove);

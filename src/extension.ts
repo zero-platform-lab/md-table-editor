@@ -1,12 +1,17 @@
 import * as vscode from 'vscode';
-import { findTable, parseTable, serializeTable, TableRange } from './tableParser';
+import { findTable, findTableByHeaders, parseTable, serializeTable, TableRange } from './tableParser';
 import { getWebviewHtml } from './webview';
 
 let currentPanel: vscode.WebviewPanel | undefined;
 let currentEditor: vscode.TextEditor | undefined;
 let currentRange: TableRange | undefined;
+let currentHeaderSignature: string | undefined;
 let isInsertMode = false;
 let isSelfEdit = false;
+
+function headerSig(headers: string[]): string {
+  return headers.join('\x00');
+}
 
 function openPanel(
   context: vscode.ExtensionContext,
@@ -19,6 +24,7 @@ function openPanel(
 ) {
   currentEditor = editor;
   currentRange = range;
+  currentHeaderSignature = headerSig(headers);
   isInsertMode = insertMode;
 
   if (currentPanel) {
@@ -37,6 +43,7 @@ function openPanel(
     currentPanel.webview.onDidReceiveMessage(
       async (msg) => {
         if (msg.type === 'apply') {
+          currentHeaderSignature = headerSig(msg.headers);
           await applyChanges(msg);
         }
       },
@@ -48,6 +55,7 @@ function openPanel(
       currentPanel = undefined;
       currentEditor = undefined;
       currentRange = undefined;
+      currentHeaderSignature = undefined;
       isInsertMode = false;
     }, null, context.subscriptions);
   }
@@ -100,13 +108,17 @@ export function activate(context: vscode.ExtensionContext) {
       if (e.document !== currentEditor.document) return;
 
       const lines = e.document.getText().split('\n');
-      const range = findTable(lines, currentRange.startLine);
+
+      let range = findTable(lines, currentRange.startLine);
+      if (!range && currentHeaderSignature) {
+        range = findTableByHeaders(lines, currentHeaderSignature.split('\x00'));
+      }
       if (!range) return;
 
       currentRange = range;
       const tableData = parseTable(lines, range);
       currentPanel.webview.postMessage({
-        type: 'load',
+        type: 'update',
         headers: tableData.headers,
         rows: tableData.rows,
         alignments: tableData.alignments,
